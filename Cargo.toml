@@ -1,0 +1,46 @@
+[package]
+name = "tuxtalks"
+version = "0.1.0"
+edition = "2021"
+authors = ["TuxTalks Contributors"]
+description = "Voice control for Linux gaming"
+license = "MIT"
+repository = "https://github.com/StarTuz/tuxtalks"
+
+[dependencies]
+# Async Runtime
+tokio = { version = "1", features = ["full"] }
+
+# Audio
+cpal = "0.15"
+rodio = "0.19"
+
+# ASR
+vosk = "0.2"
+
+# D-Bus (speechd-ng integration)
+zbus = "4"
+
+# Input simulation (Linux native)
+evdev = "0.12"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Error handling
+anyhow = "1"
+thiserror = "1"
+
+# Path utilities
+dirs = "5"
+
+[dev-dependencies]
+tokio-test = "0.4"
