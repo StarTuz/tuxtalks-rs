@@ -6,6 +6,7 @@ mod asr;
 mod audio;
 mod commands;
 mod config;
+mod games;
 mod input;
 mod speechd;
 
