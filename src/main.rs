@@ -50,11 +50,24 @@ async fn main() -> Result<()> {
 
     // Initialize ASR
     let mut asr = asr::VoskAsr::new()?;
-    info!("🗣️ ASR engine ready");
-
     // Initialize command processor
     let mut processor = CommandProcessor::new()?;
-    processor.add_demo_bindings();
+
+    // Initialize game manager
+    let mut game_manager = games::GameManager::new()?;
+    if let Some(idx) = game_manager.detect_active_profile() {
+        let profile = &game_manager.profiles[idx];
+        info!("🎯 Auto-detected active game: {}", profile.name);
+        
+        let commands = profile.get_processor_commands();
+        for cmd in commands {
+            processor.add_command(cmd);
+        }
+        processor.set_action_map(profile.resolve_actions());
+    } else {
+        info!("💡 No active game detected, using demo bindings");
+        processor.add_demo_bindings();
+    }
 
     // Optionally connect to speechd-ng for TTS
     let speechd_client = if args.speechd {

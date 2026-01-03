@@ -46,6 +46,9 @@ pub fn init_defaults(profile: &mut GameProfile) {
             .voice_commands
             .insert(friendly.to_string(), triggers);
     }
+
+    // Process names for auto-detection
+    profile.process_names = vec!["X4.exe".into(), "X4".into()];
 }
 
 /// Parse X4 Foundations inputmap.xml file

@@ -26,6 +26,8 @@ pub struct TuxTalksApp {
     game_manager: GameManager,
     /// Command Processor
     processor: CommandProcessor,
+    /// TTS Client
+    speechd: Option<crate::speechd::SpeechdClient>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -45,6 +47,9 @@ pub enum Message {
     StartPressed,
     StopPressed,
     ProfileSelected(String),
+    AutoDetect,
+    SpeechdConnected(crate::speechd::SpeechdClient),
+    SpeechdFailed,
 }
 
 impl TuxTalksApp {
@@ -59,9 +64,18 @@ impl TuxTalksApp {
             transcriptions: Vec::new(),
             game_manager,
             processor,
+            speechd: None,
         };
 
-        (app, Task::none())
+        // Initialize speechd in background
+        let init_task = Task::perform(crate::speechd::SpeechdClient::connect(), |res| {
+            match res {
+                Ok(client) => Message::SpeechdConnected(client),
+                Err(_) => Message::SpeechdFailed,
+            }
+        });
+
+        (app, init_task)
     }
 
     pub fn title(&self) -> String {
@@ -113,6 +127,12 @@ impl TuxTalksApp {
                     // Process command
                     if let Some(cmd_name) = self.processor.process(&text) {
                         self.status = format!("Executed: {}", cmd_name);
+                        
+                        // TTS Feedback
+                        if let Some(speechd) = &self.speechd {
+                            let text_to_speak = format!("Executing {}", cmd_name);
+                            return Task::perform(msg_speak(speechd.clone(), text_to_speak), |_| Message::AutoDetect); // Dummy message for task completion
+                        }
                     }
                 }
             }
@@ -123,13 +143,30 @@ impl TuxTalksApp {
                     self.game_manager.save_profiles().ok();
                 }
             }
+            Message::AutoDetect => {
+                if let Some(idx) = self.game_manager.detect_active_profile() {
+                    let name = &self.game_manager.profiles[idx].name;
+                    info!("🤖 Auto-detected profile: {}", name);
+                    self.status = format!("Detected: {}", name);
+                }
+            }
+            Message::SpeechdConnected(client) => {
+                info!("🔊 Speechd connected");
+                self.speechd = Some(client);
+            }
+            Message::SpeechdFailed => {
+                warn!("🔇 Speechd failed to connect");
+            }
         }
         Task::none()
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
+        let mut subscriptions = Vec::new();
+
+        // ASR Subscription
         if self.listening {
-            Subscription::run(|| {
+            subscriptions.push(Subscription::run(|| {
                 futures::stream::unfold((), |_| async move {
                     // Start capture
                     let mut audio_rx = match audio::start_capture(None) {
@@ -141,7 +178,7 @@ impl TuxTalksApp {
                         }
                     };
 
-                    // Start ASR (Vosk loading is heavy, should ideally be outside this loop)
+                    // Start ASR
                     let mut asr = match VoskAsr::new() {
                         Ok(asr) => asr,
                         Err(e) => {
@@ -152,7 +189,6 @@ impl TuxTalksApp {
                     };
 
                     loop {
-                        // Use non-blocking recv or await
                         if let Some(samples) = audio_rx.recv().await {
                             match asr.process(&samples) {
                                 Ok(Some(text)) => {
@@ -171,13 +207,16 @@ impl TuxTalksApp {
 
                     Some((Message::Transcription("ASR Restarting...".into()), ()))
                 })
-            })
-        } else {
-            Subscription::none()
+            }));
         }
+
+        // Periodic Auto-Detection Subscription
+        subscriptions.push(iced::time::every(std::time::Duration::from_secs(5)).map(|_| Message::AutoDetect));
+
+        Subscription::batch(subscriptions)
     }
 
-    pub fn view(&self) -> Element<Message> {
+    pub fn view(&self) -> Element<'_, Message> {
         let sidebar = self.view_sidebar();
         let content = match self.current_tab {
             Tab::Home => self.view_home(),
@@ -200,7 +239,7 @@ impl TuxTalksApp {
             .into()
     }
 
-    fn view_sidebar(&self) -> Element<Message> {
+    fn view_sidebar(&self) -> Element<'_, Message> {
         let tabs = column![
             self.tab_button("🏠 Home", Tab::Home),
             self.tab_button("🎮 Games", Tab::Games),
@@ -234,7 +273,7 @@ impl TuxTalksApp {
             .into()
     }
 
-    fn view_home(&self) -> Element<Message> {
+    fn view_home(&self) -> Element<'_, Message> {
         let status_text = text(&self.status).size(24);
 
         let listening_btn = if self.listening {
@@ -299,14 +338,32 @@ impl TuxTalksApp {
         .into()
     }
 
-    fn view_games(&self) -> Element<Message> {
+    fn view_games(&self) -> Element<'_, Message> {
         let mut content = Column::new().spacing(15);
         content = content.push(text("Game Profiles").size(28));
+
+        // Active Profile Detail
+        if let Some(profile) = self.game_manager.get_active_profile() {
+            content = content.push(
+                container(
+                    column![
+                        text(format!("Selected: {}", profile.name)).size(22),
+                        text(format!("Type: {:?}", profile.game_type)).size(14).style(text::secondary),
+                        Space::with_height(10),
+                        text("Resolved Action Mapping:").size(18),
+                        self.view_resolved_actions(profile),
+                    ].spacing(5).padding(15)
+                ).style(container::rounded_box)
+            );
+        }
+
+        content = content.push(Space::with_height(20));
+        content = content.push(text("All Available Profiles:").size(20));
 
         for profile in &self.game_manager.profiles {
             let info = column![
                 text(&profile.name).size(20),
-                text(format!("{} commands | {} macros", profile.voice_commands.len(), profile.macros.len()))
+                text(format!("{} triggers | {} macros", profile.voice_commands.len(), profile.macros.len()))
                     .size(14).style(text::secondary),
             ];
 
@@ -314,7 +371,7 @@ impl TuxTalksApp {
                 container(
                     row![
                         info.width(Length::Fill),
-                        button("Edit").on_press(Message::TabSelected(Tab::Games)), // Placeholder
+                        button("Activate").on_press(Message::ProfileSelected(profile.name.clone())),
                     ].align_y(Alignment::Center).padding(15)
                 ).style(container::rounded_box)
             );
@@ -323,7 +380,39 @@ impl TuxTalksApp {
         scrollable(content).into()
     }
 
-    fn view_speech(&self) -> Element<Message> {
+    fn view_resolved_actions(&self, profile: &GameProfile) -> Element<'_, Message> {
+        let actions = profile.resolve_actions();
+        if actions.is_empty() {
+            return text("No actions resolved. Are your bindings loaded?").style(text::danger).into();
+        }
+
+        let mut list = Column::new().spacing(5);
+        let mut keys: Vec<String> = actions.keys().cloned().collect();
+        keys.sort();
+
+        for name in keys {
+            if let Some(binding) = actions.get(&name) {
+                let key_str = binding.primary_key.as_deref().unwrap_or("None");
+                let mods = if binding.modifiers.is_empty() {
+                    "".to_string()
+                } else {
+                    format!(" (+ {:?})", binding.modifiers)
+                };
+                
+                list = list.push(
+                    row![
+                        text(name.to_string()).width(Length::Fixed(150.0)),
+                        text("👉").width(Length::Fixed(30.0)),
+                        text(format!("{}{}", key_str, mods)).style(text::success),
+                    ]
+                );
+            }
+        }
+
+        container(list).padding(10).into()
+    }
+
+    fn view_speech(&self) -> Element<'_, Message> {
         column![
             text("Speech Engines").size(28),
             Space::with_height(10),
@@ -338,7 +427,7 @@ impl TuxTalksApp {
         .into()
     }
 
-    fn view_settings(&self) -> Element<Message> {
+    fn view_settings(&self) -> Element<'_, Message> {
         column![
             text("Settings").size(28),
             Space::with_height(10),
@@ -353,4 +442,8 @@ impl TuxTalksApp {
     pub fn theme(&self) -> Theme {
         Theme::Dark
     }
+}
+
+async fn msg_speak(client: crate::speechd::SpeechdClient, text: String) {
+    let _ = client.speak(&text).await;
 }

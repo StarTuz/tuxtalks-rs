@@ -69,6 +69,13 @@ pub fn init_defaults(profile: &mut GameProfile) {
         );
     }
 
+    // Process names for auto-detection
+    profile.process_names = vec![
+        "EliteDangerous64.exe".into(),
+        "EliteDangerous.exe".into(),
+        "EDLaunch.exe".into(),
+    ];
+
     // Default Macros
     profile.macros.push(Macro {
         name: "RequestDocking".into(),

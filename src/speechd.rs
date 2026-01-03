@@ -33,6 +33,7 @@ trait SpeechService {
 }
 
 /// Client for communicating with speechd-ng
+#[derive(Debug, Clone)]
 pub struct SpeechdClient {
     proxy: SpeechServiceProxy<'static>,
 }

@@ -61,5 +61,8 @@ thiserror = "1"
 # Path utilities
 dirs = "5"
 
+# System info
+sysinfo = "0.33"
+
 [dev-dependencies]
 tokio-test = "0.4"

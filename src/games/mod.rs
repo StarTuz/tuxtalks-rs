@@ -44,6 +44,8 @@ pub struct GameProfile {
     pub macros: Vec<Macro>,
     /// Friendly Name -> Raw Tags mapping (e.g., "Lights" -> ["ShipSpotLightToggle", "Headlights"])
     pub virtual_tags: HashMap<String, Vec<String>>,
+    /// Process names to look for (e.g., ["EliteDangerous64.exe"])
+    pub process_names: Vec<String>,
     /// Is this profile active?
     pub enabled: bool,
 }
@@ -58,6 +60,7 @@ impl GameProfile {
             voice_commands: HashMap::new(),
             macros: Vec::new(),
             virtual_tags: HashMap::new(),
+            process_names: Vec::new(),
             enabled: false,
         };
 
@@ -139,6 +142,7 @@ pub struct GameManager {
     pub profiles: Vec<GameProfile>,
     pub active_profile_index: Option<usize>,
     config_dir: PathBuf,
+    sys: sysinfo::System,
 }
 
 impl GameManager {
@@ -153,6 +157,7 @@ impl GameManager {
             profiles: Vec::new(),
             active_profile_index: None,
             config_dir,
+            sys: sysinfo::System::new_all(),
         };
 
         manager.load_profiles().ok();
@@ -195,5 +200,31 @@ impl GameManager {
     pub fn get_active_profile(&self) -> Option<&GameProfile> {
         self.active_profile_index
             .and_then(|idx| self.profiles.get(idx))
+    }
+
+    /// Automatically detect which game is running and set it as active
+    pub fn detect_active_profile(&mut self) -> Option<usize> {
+        self.sys
+            .refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+
+        for (i, profile) in self.profiles.iter().enumerate() {
+            for proc_name in &profile.process_names {
+                // Check if any process matches
+                let running = self.sys.processes().values().any(|p| {
+                    p.name()
+                        .to_string_lossy()
+                        .to_lowercase()
+                        .contains(&proc_name.to_lowercase())
+                });
+
+                if running {
+                    debug!("🎯 Auto-detected game: {}", profile.name);
+                    self.active_profile_index = Some(i);
+                    return Some(i);
+                }
+            }
+        }
+
+        None
     }
 }
