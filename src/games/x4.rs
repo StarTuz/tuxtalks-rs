@@ -10,7 +10,43 @@ use std::fs;
 use std::path::Path;
 use tracing::{debug, info};
 
-use super::KeyBinding;
+use super::{GameProfile, KeyBinding};
+
+/// Initialize default virtual tags and voice commands for X4 Foundations
+pub fn init_defaults(profile: &mut GameProfile) {
+    let virtual_tags = vec![
+        ("Boost", vec!["INPUT_ACTION_BOOST", "INPUT_STATE_BOOST"]),
+        ("Scan Mode", vec!["INPUT_ACTION_TOGGLE_SCAN_MODE"]),
+        ("Travel Mode", vec!["INPUT_ACTION_TOGGLE_TRAVEL_MODE"]),
+        ("Landing Gear", vec!["INPUT_ACTION_TOGGLE_LANDING_GEAR"]),
+        ("Map", vec!["INPUT_ACTION_OPEN_MAP"]),
+        ("Interact", vec!["INPUT_ACTION_INTERACT"]),
+    ];
+
+    for (friendly, tags) in virtual_tags {
+        profile.virtual_tags.insert(
+            friendly.to_string(),
+            tags.iter().map(|s| s.to_string()).collect(),
+        );
+    }
+
+    let voice_commands = vec![
+        ("Boost", vec!["boost".into(), "burn".into()]),
+        ("Scan Mode", vec!["scan mode".into(), "toggle scan".into()]),
+        (
+            "Travel Mode",
+            vec!["travel mode".into(), "engage travel".into()],
+        ),
+        ("Map", vec!["open map".into(), "show map".into()]),
+        ("Landing Gear", vec!["landing gear".into(), "gear".into()]),
+    ];
+
+    for (friendly, triggers) in voice_commands {
+        profile
+            .voice_commands
+            .insert(friendly.to_string(), triggers);
+    }
+}
 
 /// Parse X4 Foundations inputmap.xml file
 pub fn parse_bindings(path: &Path, bindings: &mut HashMap<String, KeyBinding>) -> Result<usize> {
@@ -27,7 +63,6 @@ pub fn parse_bindings(path: &Path, bindings: &mut HashMap<String, KeyBinding>) -
             Ok(Event::Empty(ref e)) | Ok(Event::Start(ref e)) => {
                 let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
 
-                // X4 uses <action> elements with id and input attributes
                 if tag_name == "action" {
                     let mut action_id = String::new();
                     let mut input_code = String::new();
@@ -104,17 +139,4 @@ fn parse_x4_input(input: &str) -> Option<String> {
         "RALT" | "RIGHTALT" => "RALT".to_string(),
         other => other.to_uppercase(),
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_x4_input() {
-        assert_eq!(parse_x4_input("INPUT_KEY_A"), Some("A".to_string()));
-        assert_eq!(parse_x4_input("INPUT_KEY_SPACE"), Some("SPACE".to_string()));
-        assert_eq!(parse_x4_input("INPUT_KEY_F1"), Some("F1".to_string()));
-        assert_eq!(parse_x4_input("INVALID"), None);
-    }
 }

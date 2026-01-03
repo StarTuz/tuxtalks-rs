@@ -7,6 +7,7 @@ mod audio;
 mod commands;
 mod config;
 mod games;
+mod gui;
 mod input;
 mod speechd;
 
@@ -44,7 +45,7 @@ async fn main() -> Result<()> {
     info!("🐧 TuxTalks v{} starting...", env!("CARGO_PKG_VERSION"));
 
     // Initialize audio capture
-    let audio_rx = audio::start_capture(args.device)?;
+    let mut audio_rx = audio::start_capture(args.device)?;
     info!("🎙️ Audio capture started");
 
     // Initialize ASR
@@ -54,11 +55,6 @@ async fn main() -> Result<()> {
     // Initialize command processor
     let mut processor = CommandProcessor::new()?;
     processor.add_demo_bindings();
-
-    if !processor.has_keyboard() {
-        warn!("⚠️ Running without keyboard simulation");
-        warn!("   Voice commands will be recognized but not executed");
-    }
 
     // Optionally connect to speechd-ng for TTS
     let speechd_client = if args.speechd {
@@ -80,23 +76,22 @@ async fn main() -> Result<()> {
     info!("✅ TuxTalks ready - speak a command");
     info!("   Try: 'boost', 'fire', 'pause', 'screenshot', 'quick save'");
 
-    loop {
-        // Get audio chunk from capture thread
-        if let Ok(samples) = audio_rx.recv() {
-            // Feed to ASR
-            if let Some(text) = asr.process(&samples)? {
-                if !text.is_empty() {
-                    info!("📝 Heard: '{}'", text);
+    while let Some(samples) = audio_rx.recv().await {
+        // Feed to ASR
+        if let Some(text) = asr.process(&samples)? {
+            if !text.is_empty() {
+                info!("📝 Heard: '{}'", text);
 
-                    // Process command
-                    if let Some(cmd) = processor.process(&text) {
-                        // Speak feedback if speechd available
-                        if let Some(ref client) = speechd_client {
-                            client.speak(&format!("Executing {}", cmd)).await.ok();
-                        }
+                // Process command
+                if let Some(cmd) = processor.process(&text) {
+                    // Speak feedback if speechd available
+                    if let Some(ref client) = speechd_client {
+                        client.speak(&format!("Executing {}", cmd)).await.ok();
                     }
                 }
             }
         }
     }
+
+    Ok(())
 }

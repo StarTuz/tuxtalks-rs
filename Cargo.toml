@@ -22,6 +22,7 @@ path = "src/bin/launcher.rs"
 [dependencies]
 # Async Runtime
 tokio = { version = "1", features = ["full"] }
+futures = "0.3"
 
 # Audio
 cpal = "0.15"

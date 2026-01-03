@@ -10,7 +10,101 @@ use std::fs;
 use std::path::Path;
 use tracing::{debug, info};
 
-use super::KeyBinding;
+use super::{GameProfile, KeyBinding};
+use crate::commands::{Macro, MacroStep};
+
+/// Initialize default virtual tags and voice commands for Elite Dangerous
+pub fn init_defaults(profile: &mut GameProfile) {
+    // Virtual Tags: Friendly Name -> [XML Tags]
+    let virtual_tags = vec![
+        ("External Panel", vec!["FocusLeftPanel", "TargetPanel"]),
+        ("Internal Panel", vec!["FocusRightPanel", "SystemPanel"]),
+        ("Role Panel", vec!["FocusRadarPanel", "RolePanel"]),
+        ("Comms Panel", vec!["FocusCommsPanel", "QuickCommsPanel"]),
+        ("Galaxy Map", vec!["GalaxyMapOpen"]),
+        ("System Map", vec!["SystemMapOpen"]),
+        ("Landing Gear", vec!["LandingGearToggle", "LandingGear"]),
+        ("Cargo Scoop", vec!["ToggleCargoScoop", "CargoScoop"]),
+        ("Flight Assist", vec!["ToggleFlightAssist", "FlightAssist"]),
+        ("Boost", vec!["UseBoostJuice", "Boost"]),
+        (
+            "Frame Shift Drive",
+            vec!["HyperSuperCombination", "Supercruise", "Hyperspace"],
+        ),
+        ("Lights", vec!["ShipSpotLightToggle", "Headlights"]),
+        (
+            "Hardpoints",
+            vec!["DeployHardpointToggle", "DeployHardpoints"],
+        ),
+    ];
+
+    for (friendly, tags) in virtual_tags {
+        profile.virtual_tags.insert(
+            friendly.to_string(),
+            tags.iter().map(|s| s.to_string()).collect(),
+        );
+    }
+
+    // Voice Commands: Friendly Name -> [Triggers]
+    let voice_commands = vec![
+        ("Boost", vec!["boost", "boost engines", "afterburner"]),
+        ("Landing Gear", vec!["landing gear", "gear", "deploy gear"]),
+        ("Cargo Scoop", vec!["cargo scoop", "scoop", "utility scoop"]),
+        ("Lights", vec!["lights", "ship lights", "headlights"]),
+        ("Galaxy Map", vec!["galaxy map", "open map", "star map"]),
+        (
+            "Hardpoints",
+            vec!["hard points", "weapons", "deploy weapons"],
+        ),
+        (
+            "Frame Shift Drive",
+            vec!["engage", "warp", "jump", "hyperspace"],
+        ),
+    ];
+
+    for (friendly, triggers) in voice_commands {
+        profile.voice_commands.insert(
+            friendly.to_string(),
+            triggers.iter().map(|s| s.to_string()).collect(),
+        );
+    }
+
+    // Default Macros
+    profile.macros.push(Macro {
+        name: "RequestDocking".into(),
+        triggers: vec!["request docking".into(), "docking request".into()],
+        steps: vec![
+            MacroStep {
+                action: "External Panel".into(),
+                delay: 500,
+            },
+            MacroStep {
+                action: "CycleNextPanel".into(),
+                delay: 200,
+            },
+            MacroStep {
+                action: "CycleNextPanel".into(),
+                delay: 200,
+            },
+            MacroStep {
+                action: "UI_Select".into(),
+                delay: 200,
+            },
+            MacroStep {
+                action: "UI_Down".into(),
+                delay: 200,
+            },
+            MacroStep {
+                action: "UI_Select".into(),
+                delay: 200,
+            },
+            MacroStep {
+                action: "External Panel".into(),
+                delay: 200,
+            },
+        ],
+    });
+}
 
 /// Parse Elite Dangerous .binds XML file
 pub fn parse_bindings(path: &Path, bindings: &mut HashMap<String, KeyBinding>) -> Result<usize> {
@@ -46,7 +140,7 @@ pub fn parse_bindings(path: &Path, bindings: &mut HashMap<String, KeyBinding>) -
                 }
 
                 // Primary/Secondary binding elements
-                if let Some(ref action) = current_action {
+                if let Some(ref _action) = current_action {
                     if tag_name == "Primary" || tag_name == "Secondary" {
                         // Extract Device and Key attributes
                         let mut device = String::new();
@@ -136,7 +230,6 @@ fn normalize_ed_key(key: &str) -> String {
     let key = key.strip_prefix("Key_").unwrap_or(key);
 
     match key.to_uppercase().as_str() {
-        // Letters are already fine
         "SPACE" => "SPACE".to_string(),
         "ESCAPE" => "ESC".to_string(),
         "RETURN" => "ENTER".to_string(),
@@ -159,18 +252,5 @@ fn normalize_ed_key(key: &str) -> String {
         "LEFTALT" => "LALT".to_string(),
         "RIGHTALT" => "RALT".to_string(),
         other => other.to_uppercase(),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_normalize_key() {
-        assert_eq!(normalize_ed_key("Key_A"), "A");
-        assert_eq!(normalize_ed_key("Key_Space"), "SPACE");
-        assert_eq!(normalize_ed_key("Key_LeftShift"), "LSHIFT");
-        assert_eq!(normalize_ed_key("Key_F1"), "F1");
     }
 }

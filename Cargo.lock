@@ -3980,6 +3980,7 @@ dependencies = [
  "cpal",
  "dirs 5.0.1",
  "evdev",
+ "futures",
  "iced",
  "quick-xml 0.36.2",
  "rodio",
