@@ -7,6 +7,18 @@ description = "Voice control for Linux gaming"
 license = "MIT"
 repository = "https://github.com/StarTuz/tuxtalks"
 
+[lib]
+name = "tuxtalks"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tuxtalks"
+path = "src/main.rs"
+
+[[bin]]
+name = "tuxtalks-launcher"
+path = "src/bin/launcher.rs"
+
 [dependencies]
 # Async Runtime
 tokio = { version = "1", features = ["full"] }
@@ -23,6 +35,9 @@ zbus = "4"
 
 # Input simulation (Linux native)
 evdev = "0.12"
+
+# GUI
+iced = { version = "0.13", features = ["tokio"] }
 
 # CLI
 clap = { version = "4", features = ["derive"] }
