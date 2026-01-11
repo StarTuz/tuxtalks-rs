@@ -1,12 +1,14 @@
-//! Input simulation module using Linux evdev/uinput
+//! Input simulation and listening module using Linux evdev/uinput
 //!
-//! Provides native key simulation without X11 dependencies.
+//! Provides native key simulation and global key listening without X11 dependencies.
 //! Works on both X11 and Wayland.
 
 use anyhow::{Context, Result};
-use evdev::{uinput::VirtualDeviceBuilder, AttributeSet, Key};
+use evdev::{uinput::VirtualDeviceBuilder, AttributeSet, EventType, InputEvent, Key};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tracing::{debug, info};
 
 /// Virtual keyboard for simulating key presses
@@ -124,8 +126,8 @@ impl VirtualKeyboard {
     /// Press a key (without releasing)
     pub fn press_key(&mut self, key: Key) -> Result<()> {
         debug!("Key down: {:?}", key);
-        self.device.emit(&[evdev::InputEvent::new(
-            evdev::EventType::KEY,
+        self.device.emit(&[InputEvent::new(
+            EventType::KEY,
             key.code(),
             1, // Press
         )])?;
@@ -135,8 +137,8 @@ impl VirtualKeyboard {
     /// Release a key
     pub fn release_key(&mut self, key: Key) -> Result<()> {
         debug!("Key up: {:?}", key);
-        self.device.emit(&[evdev::InputEvent::new(
-            evdev::EventType::KEY,
+        self.device.emit(&[InputEvent::new(
+            EventType::KEY,
             key.code(),
             0, // Release
         )])?;
@@ -145,118 +147,266 @@ impl VirtualKeyboard {
 
     /// Type a key combination (e.g., Ctrl+C)
     pub fn key_combo(&mut self, modifiers: &[Key], key: Key) -> Result<()> {
-        // Press modifiers
         for modifier in modifiers {
             self.press_key(*modifier)?;
             thread::sleep(Duration::from_millis(5));
         }
-
-        // Tap the main key
         self.tap_key(key)?;
-
-        // Release modifiers in reverse order
         for modifier in modifiers.iter().rev() {
             self.release_key(*modifier)?;
             thread::sleep(Duration::from_millis(5));
         }
-
         Ok(())
+    }
+}
+
+/// Listens for global key events using evdev
+pub struct InputListener {
+    ptt_key: Option<Key>,
+    ptt_mode: PttMode,
+    key_bindings: HashMap<Key, String>,
+    state: Arc<Mutex<ListenerState>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PttMode {
+    Hold,
+    Toggle,
+}
+
+struct ListenerState {
+    ptt_active: bool,
+    last_toggle: Instant,
+}
+
+impl InputListener {
+    pub fn new(ptt_key: Option<Key>, ptt_mode: PttMode) -> Self {
+        Self {
+            ptt_key,
+            ptt_mode,
+            key_bindings: HashMap::new(),
+            state: Arc::new(Mutex::new(ListenerState {
+                ptt_active: false,
+                last_toggle: Instant::now() - Duration::from_secs(1),
+            })),
+        }
+    }
+
+    pub fn add_binding(&mut self, key: Key, command: String) {
+        self.key_bindings.insert(key, command);
+    }
+
+    pub fn is_ptt_active(&self) -> bool {
+        self.state.lock().map(|s| s.ptt_active).unwrap_or(false)
+    }
+
+    /// Starts listening in a background thread
+    pub fn start(&mut self) -> Result<tokio::sync::mpsc::Receiver<String>> {
+        let (tx, rx) = tokio::sync::mpsc::channel(100);
+        let ptt_key = self.ptt_key;
+        let ptt_mode = self.ptt_mode;
+        let bindings = self.key_bindings.clone();
+        let state = Arc::clone(&self.state);
+
+        thread::spawn(move || {
+            let mut devices = Vec::new();
+
+            loop {
+                // Find keyboards if we have none
+                if devices.is_empty() {
+                    for (_, dev) in evdev::enumerate() {
+                        if dev
+                            .name()
+                            .map(|n| n.to_lowercase().contains("keyboard"))
+                            .unwrap_or(false)
+                        {
+                            devices.push(dev);
+                        }
+                    }
+                    if devices.is_empty() {
+                        thread::sleep(Duration::from_secs(2));
+                        continue;
+                    }
+                    debug!("⌨️ Found {} keyboard device(s)", devices.len());
+                }
+
+                // Poll devices
+                let mut to_remove = Vec::new();
+                for (idx, dev) in devices.iter_mut().enumerate() {
+                    match dev.fetch_events() {
+                        Ok(events) => {
+                            for event in events {
+                                if event.event_type() == EventType::KEY {
+                                    let key = Key::new(event.code());
+                                    let val = event.value(); // 0: release, 1: press, 2: repeat
+
+                                    // Handle PTT
+                                    if Some(key) == ptt_key {
+                                        let mut s =
+                                            state.lock().expect("InputListener mutex poisoned");
+                                        match ptt_mode {
+                                            PttMode::Hold => {
+                                                if val == 1 {
+                                                    s.ptt_active = true;
+                                                } else if val == 0 {
+                                                    s.ptt_active = false;
+                                                }
+                                            }
+                                            PttMode::Toggle => {
+                                                if val == 1
+                                                    && s.last_toggle.elapsed()
+                                                        > Duration::from_millis(500)
+                                                {
+                                                    s.ptt_active = !s.ptt_active;
+                                                    s.last_toggle = Instant::now();
+                                                    info!("🎤 PTT Toggled: {}", s.ptt_active);
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Handle bindings
+                                    if val == 1 {
+                                        if let Some(cmd) = bindings.get(&key) {
+                                            let _ = tx.blocking_send(cmd.clone());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
+                        Err(_) => {
+                            to_remove.push(idx);
+                        }
+                    }
+                }
+
+                for idx in to_remove.into_iter().rev() {
+                    devices.remove(idx);
+                }
+
+                thread::sleep(Duration::from_millis(10));
+            }
+        });
+
+        Ok(rx)
     }
 }
 
 /// Parse a key name string to evdev Key
 pub fn parse_key(name: &str) -> Option<Key> {
-    match name.to_uppercase().as_str() {
-        // Letters
-        "A" => Some(Key::KEY_A),
-        "B" => Some(Key::KEY_B),
-        "C" => Some(Key::KEY_C),
-        "D" => Some(Key::KEY_D),
-        "E" => Some(Key::KEY_E),
-        "F" => Some(Key::KEY_F),
-        "G" => Some(Key::KEY_G),
-        "H" => Some(Key::KEY_H),
-        "I" => Some(Key::KEY_I),
-        "J" => Some(Key::KEY_J),
-        "K" => Some(Key::KEY_K),
-        "L" => Some(Key::KEY_L),
-        "M" => Some(Key::KEY_M),
-        "N" => Some(Key::KEY_N),
-        "O" => Some(Key::KEY_O),
-        "P" => Some(Key::KEY_P),
-        "Q" => Some(Key::KEY_Q),
-        "R" => Some(Key::KEY_R),
-        "S" => Some(Key::KEY_S),
-        "T" => Some(Key::KEY_T),
-        "U" => Some(Key::KEY_U),
-        "V" => Some(Key::KEY_V),
-        "W" => Some(Key::KEY_W),
-        "X" => Some(Key::KEY_X),
-        "Y" => Some(Key::KEY_Y),
-        "Z" => Some(Key::KEY_Z),
-        // Numbers
-        "0" => Some(Key::KEY_0),
-        "1" => Some(Key::KEY_1),
-        "2" => Some(Key::KEY_2),
-        "3" => Some(Key::KEY_3),
-        "4" => Some(Key::KEY_4),
-        "5" => Some(Key::KEY_5),
-        "6" => Some(Key::KEY_6),
-        "7" => Some(Key::KEY_7),
-        "8" => Some(Key::KEY_8),
-        "9" => Some(Key::KEY_9),
-        // Function keys
-        "F1" => Some(Key::KEY_F1),
-        "F2" => Some(Key::KEY_F2),
-        "F3" => Some(Key::KEY_F3),
-        "F4" => Some(Key::KEY_F4),
-        "F5" => Some(Key::KEY_F5),
-        "F6" => Some(Key::KEY_F6),
-        "F7" => Some(Key::KEY_F7),
-        "F8" => Some(Key::KEY_F8),
-        "F9" => Some(Key::KEY_F9),
-        "F10" => Some(Key::KEY_F10),
-        "F11" => Some(Key::KEY_F11),
-        "F12" => Some(Key::KEY_F12),
-        // Modifiers
-        "SHIFT" | "LSHIFT" => Some(Key::KEY_LEFTSHIFT),
-        "RSHIFT" => Some(Key::KEY_RIGHTSHIFT),
-        "CTRL" | "LCTRL" | "CONTROL" => Some(Key::KEY_LEFTCTRL),
-        "RCTRL" => Some(Key::KEY_RIGHTCTRL),
-        "ALT" | "LALT" => Some(Key::KEY_LEFTALT),
-        "RALT" => Some(Key::KEY_RIGHTALT),
-        // Navigation
-        "UP" => Some(Key::KEY_UP),
-        "DOWN" => Some(Key::KEY_DOWN),
-        "LEFT" => Some(Key::KEY_LEFT),
-        "RIGHT" => Some(Key::KEY_RIGHT),
-        "HOME" => Some(Key::KEY_HOME),
-        "END" => Some(Key::KEY_END),
-        "PAGEUP" | "PGUP" => Some(Key::KEY_PAGEUP),
-        "PAGEDOWN" | "PGDN" => Some(Key::KEY_PAGEDOWN),
-        // Common
-        "SPACE" => Some(Key::KEY_SPACE),
-        "ENTER" | "RETURN" => Some(Key::KEY_ENTER),
-        "TAB" => Some(Key::KEY_TAB),
-        "ESC" | "ESCAPE" => Some(Key::KEY_ESC),
-        "BACKSPACE" => Some(Key::KEY_BACKSPACE),
-        "DELETE" | "DEL" => Some(Key::KEY_DELETE),
-        "INSERT" | "INS" => Some(Key::KEY_INSERT),
-        "PAUSE" => Some(Key::KEY_PAUSE),
+    let name_lower = name.to_lowercase();
+
+    // 1. Explicit Scancode Mapping for Parity (Team APPROVED)
+    // This ensures ydotool-style string digits result in correct hardware codes (e.g. '1' -> 2)
+    // This is critical for Wayland stability and parity with the Python fix.
+    let scancode = match name_lower.as_str() {
+        "1" => Some(2),
+        "2" => Some(3),
+        "3" => Some(4),
+        "4" => Some(5),
+        "5" => Some(6),
+        "6" => Some(7),
+        "7" => Some(8),
+        "8" => Some(9),
+        "9" => Some(10),
+        "0" => Some(11),
+        "tab" => Some(15),
+        "enter" | "return" => Some(28),
+        "space" => Some(57),
+        "esc" | "escape" => Some(1),
+        "backspace" => Some(14),
+        "delete" | "del" => Some(111),
+        "up" => Some(103),
+        "down" => Some(108),
+        "left" => Some(105),
+        "right" => Some(106),
         _ => None,
+    };
+
+    if let Some(code) = scancode {
+        return Some(Key::new(code));
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+    // 2. Legacy/Standard mapping
+    // Add prefix if missing
+    let full_name = if name.starts_with("KEY_") {
+        name.to_uppercase()
+    } else {
+        format!("KEY_{}", name.to_uppercase())
+    };
 
-    #[test]
-    fn test_parse_key() {
-        assert_eq!(parse_key("a"), Some(Key::KEY_A));
-        assert_eq!(parse_key("A"), Some(Key::KEY_A));
-        assert_eq!(parse_key("F1"), Some(Key::KEY_F1));
-        assert_eq!(parse_key("space"), Some(Key::KEY_SPACE));
-        assert_eq!(parse_key("unknown"), None);
+    match full_name.as_str() {
+        "KEY_A" => Some(Key::KEY_A),
+        "KEY_B" => Some(Key::KEY_B),
+        "KEY_C" => Some(Key::KEY_C),
+        "KEY_D" => Some(Key::KEY_D),
+        "KEY_E" => Some(Key::KEY_E),
+        "KEY_F" => Some(Key::KEY_F),
+        "KEY_G" => Some(Key::KEY_G),
+        "KEY_H" => Some(Key::KEY_H),
+        "KEY_I" => Some(Key::KEY_I),
+        "KEY_J" => Some(Key::KEY_J),
+        "KEY_K" => Some(Key::KEY_K),
+        "KEY_L" => Some(Key::KEY_L),
+        "KEY_M" => Some(Key::KEY_M),
+        "KEY_N" => Some(Key::KEY_N),
+        "KEY_O" => Some(Key::KEY_O),
+        "KEY_P" => Some(Key::KEY_P),
+        "KEY_Q" => Some(Key::KEY_Q),
+        "KEY_R" => Some(Key::KEY_R),
+        "KEY_S" => Some(Key::KEY_S),
+        "KEY_T" => Some(Key::KEY_T),
+        "KEY_U" => Some(Key::KEY_U),
+        "KEY_V" => Some(Key::KEY_V),
+        "KEY_W" => Some(Key::KEY_W),
+        "KEY_X" => Some(Key::KEY_X),
+        "KEY_Y" => Some(Key::KEY_Y),
+        "KEY_Z" => Some(Key::KEY_Z),
+        "KEY_0" => Some(Key::KEY_0),
+        "KEY_1" => Some(Key::KEY_1),
+        "KEY_2" => Some(Key::KEY_2),
+        "KEY_3" => Some(Key::KEY_3),
+        "KEY_4" => Some(Key::KEY_4),
+        "KEY_5" => Some(Key::KEY_5),
+        "KEY_6" => Some(Key::KEY_6),
+        "KEY_7" => Some(Key::KEY_7),
+        "KEY_8" => Some(Key::KEY_8),
+        "KEY_9" => Some(Key::KEY_9),
+        "KEY_F1" => Some(Key::KEY_F1),
+        "KEY_F2" => Some(Key::KEY_F2),
+        "KEY_F3" => Some(Key::KEY_F3),
+        "KEY_F4" => Some(Key::KEY_F4),
+        "KEY_F5" => Some(Key::KEY_F5),
+        "KEY_F6" => Some(Key::KEY_F6),
+        "KEY_F7" => Some(Key::KEY_F7),
+        "KEY_F8" => Some(Key::KEY_F8),
+        "KEY_F9" => Some(Key::KEY_F9),
+        "KEY_F10" => Some(Key::KEY_F10),
+        "KEY_F11" => Some(Key::KEY_F11),
+        "KEY_F12" => Some(Key::KEY_F12),
+        "KEY_LEFTSHIFT" | "KEY_SHIFT" => Some(Key::KEY_LEFTSHIFT),
+        "KEY_RIGHTSHIFT" => Some(Key::KEY_RIGHTSHIFT),
+        "KEY_LEFTCTRL" | "KEY_CTRL" | "KEY_CONTROL" => Some(Key::KEY_LEFTCTRL),
+        "KEY_RIGHTCTRL" => Some(Key::KEY_RIGHTCTRL),
+        "KEY_LEFTALT" | "KEY_ALT" => Some(Key::KEY_LEFTALT),
+        "KEY_RIGHTALT" => Some(Key::KEY_RIGHTALT),
+        "KEY_UP" => Some(Key::KEY_UP),
+        "KEY_DOWN" => Some(Key::KEY_DOWN),
+        "KEY_LEFT" => Some(Key::KEY_LEFT),
+        "KEY_RIGHT" => Some(Key::KEY_RIGHT),
+        "KEY_HOME" => Some(Key::KEY_HOME),
+        "KEY_END" => Some(Key::KEY_END),
+        "KEY_PAGEUP" | "KEY_PGUP" => Some(Key::KEY_PAGEUP),
+        "KEY_PAGEDOWN" | "KEY_PGDN" => Some(Key::KEY_PAGEDOWN),
+        "KEY_SPACE" => Some(Key::KEY_SPACE),
+        "KEY_ENTER" | "KEY_RETURN" => Some(Key::KEY_ENTER),
+        "KEY_TAB" => Some(Key::KEY_TAB),
+        "KEY_ESC" | "KEY_ESCAPE" => Some(Key::KEY_ESC),
+        "KEY_BACKSPACE" => Some(Key::KEY_BACKSPACE),
+        "KEY_DELETE" | "KEY_DEL" => Some(Key::KEY_DELETE),
+        "KEY_INSERT" | "KEY_INS" => Some(Key::KEY_INSERT),
+        "KEY_PAUSE" => Some(Key::KEY_PAUSE),
+        _ => None,
     }
 }

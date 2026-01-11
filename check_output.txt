@@ -1,0 +1,25 @@
+    Checking tuxtalks v0.1.0 (/home/startux/Code/tuxtalks-rs)
+src/gui/tabs/input.rs:4:60: error[E0252]: the name `text` is defined multiple times: `text` reimported here
+src/gui/tabs/player.rs:4:60: error[E0252]: the name `text` is defined multiple times: `text` reimported here
+src/gui/tabs/settings.rs:3:28: error[E0252]: the name `text` is defined multiple times: `text` reimported here
+src/gui/tabs/speech.rs:3:28: error[E0252]: the name `text` is defined multiple times: `text` reimported here
+src/audio.rs:8:15: warning: unused import: `debug`
+src/config.rs:1:14: warning: unused import: `Context`
+src/config.rs:4:17: warning: unused import: `Path`
+src/games/mod.rs:12:17: warning: unused import: `Path`
+src/games/mod.rs:13:28: warning: unused import: `warn`
+src/games/mod.rs:15:39: warning: unused import: `MacroStep`
+src/gui/mod.rs:5:52: warning: unused imports: `Column`, `pick_list`, `scrollable`, and `text_input`
+src/gui/mod.rs:6:56: warning: unused import: `Alignment`
+src/gui/mod.rs:7:5: warning: unused import: `futures::StreamExt`
+src/gui/mod.rs:9:27: warning: unused import: `debug`
+src/gui/mod.rs:11:33: warning: unused import: `GameProfile`
+src/gui/mod.rs:14:41: warning: unused import: `Command`
+src/gui/tabs/input.rs:4:60: warning: unused import: `text`
+src/gui/tabs/player.rs:4:60: warning: unused import: `text`
+src/gui/tabs/settings.rs:3:28: warning: unused import: `text`
+src/gui/tabs/speech.rs:3:28: warning: unused import: `text`
+src/input.rs:12:28: warning: unused import: `warn`
+src/gui/mod.rs:443:29: warning: variable does not need to be mutable
+warning: `tuxtalks` (lib) generated 18 warnings
+error: could not compile `tuxtalks` (lib) due to 4 previous errors; 18 warnings emitted

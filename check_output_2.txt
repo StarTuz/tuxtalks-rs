@@ -1,0 +1,43 @@
+    Checking tuxtalks v0.1.0 (/home/startux/Code/tuxtalks-rs)
+src/audio.rs:8:15: warning: unused import: `debug`
+src/config.rs:1:14: warning: unused import: `Context`
+src/config.rs:4:17: warning: unused import: `Path`
+src/games/mod.rs:12:17: warning: unused import: `Path`
+src/games/mod.rs:13:28: warning: unused import: `warn`
+src/games/mod.rs:15:39: warning: unused import: `MacroStep`
+src/gui/mod.rs:5:52: warning: unused imports: `Column`, `pick_list`, `scrollable`, and `text_input`
+src/gui/mod.rs:6:56: warning: unused import: `Alignment`
+src/gui/mod.rs:7:5: warning: unused import: `futures::StreamExt`
+src/gui/mod.rs:9:27: warning: unused import: `debug`
+src/gui/mod.rs:11:33: warning: unused import: `GameProfile`
+src/gui/mod.rs:14:41: warning: unused import: `Command`
+src/input.rs:12:28: warning: unused import: `warn`
+src/gui/mod.rs:443:29: warning: variable does not need to be mutable
+warning: `tuxtalks` (lib) generated 14 warnings (run `cargo fix --lib -p tuxtalks` to apply 14 suggestions)
+src/main.rs:17:27: warning: unused import: `error`
+src/asr.rs:59:12: warning: method `reset` is never used
+src/audio.rs:73:8: warning: function `calculate_energy` is never used
+src/commands.rs:182:12: warning: method `has_keyboard` is never used
+src/games/mod.rs:78:12: warning: method `load_bindings` is never used
+src/games/mod.rs:200:12: warning: method `get_active_profile` is never used
+src/games/elite.rs:117:8: warning: function `parse_bindings` is never used
+src/games/elite.rs:227:4: warning: function `is_meta_tag` is never used
+src/games/elite.rs:235:4: warning: function `normalize_ed_key` is never used
+src/games/x4.rs:55:8: warning: function `parse_bindings` is never used
+src/games/x4.rs:117:4: warning: function `parse_x4_input` is never used
+src/gui/mod.rs:19:12: warning: struct `TuxTalksApp` is never constructed
+src/gui/mod.rs:49:10: warning: enum `Tab` is never used
+src/gui/mod.rs:60:10: warning: enum `Message` is never used
+src/gui/mod.rs:98:12: warning: multiple associated items are never used
+src/gui/mod.rs:554:10: warning: function `msg_speak` is never used
+src/gui/tabs/games.rs:6:8: warning: function `view` is never used
+src/gui/tabs/games.rs:75:4: warning: function `view_profile_editor` is never used
+src/gui/tabs/games.rs:261:4: warning: function `view_resolved_actions` is never used
+src/gui/tabs/home.rs:5:8: warning: function `view` is never used
+src/gui/tabs/input.rs:8:8: warning: function `view` is never used
+src/gui/tabs/player.rs:8:8: warning: function `view` is never used
+src/gui/tabs/settings.rs:6:8: warning: function `view` is never used
+src/gui/tabs/speech.rs:6:8: warning: function `view` is never used
+src/speechd.rs:68:18: warning: methods `speak_voice`, `listen`, `is_available`, and `get_stt_backend` are never used
+warning: `tuxtalks` (bin "tuxtalks") generated 39 warnings (14 duplicates) (run `cargo fix --bin "tuxtalks" -p tuxtalks` to apply 1 suggestion)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.79s

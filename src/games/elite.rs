@@ -76,6 +76,9 @@ pub fn init_defaults(profile: &mut GameProfile) {
         "EDLaunch.exe".into(),
     ];
 
+    // Path discriminators for Proton/GOG parity
+    profile.path_discriminators = vec!["steamapps".into(), "compatdata".into(), "gog".into()];
+
     // Default Macros
     profile.macros.push(Macro {
         name: "RequestDocking".into(),
@@ -84,30 +87,37 @@ pub fn init_defaults(profile: &mut GameProfile) {
             MacroStep {
                 action: "External Panel".into(),
                 delay: 500,
+                ..Default::default()
             },
             MacroStep {
                 action: "CycleNextPanel".into(),
                 delay: 200,
+                ..Default::default()
             },
             MacroStep {
                 action: "CycleNextPanel".into(),
                 delay: 200,
+                ..Default::default()
             },
             MacroStep {
                 action: "UI_Select".into(),
                 delay: 200,
+                ..Default::default()
             },
             MacroStep {
                 action: "UI_Down".into(),
                 delay: 200,
+                ..Default::default()
             },
             MacroStep {
                 action: "UI_Select".into(),
                 delay: 200,
+                ..Default::default()
             },
             MacroStep {
                 action: "External Panel".into(),
                 delay: 200,
+                ..Default::default()
             },
         ],
     });

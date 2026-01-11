@@ -1,11 +1,13 @@
-//! Audio capture module using cpal
-//!
 //! Captures audio from the default input device and sends it to a channel.
 
-use anyhow::{Context, Result};
+pub mod engine;
+pub use engine::{PlaybackMode, SoundEngine};
+
+use anyhow::Context;
+use anyhow::Result;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use tokio::sync::mpsc;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 const SAMPLE_RATE: u32 = 16000;
 const CHUNK_SIZE: usize = 1024;
@@ -49,7 +51,7 @@ pub fn start_capture(device_index: Option<usize>) -> Result<mpsc::UnboundedRecei
         &config,
         move |data: &[i16], _: &cpal::InputCallbackInfo| {
             // Send audio chunk - Unbounded so it won't block the audio thread
-            if let Err(_) = tx.send(data.to_vec()) {
+            if tx.send(data.to_vec()).is_err() {
                 // If receiver is dropped, this is fine when shutting down
             }
         },

@@ -8,6 +8,11 @@ use iced::application;
 use tuxtalks::gui::TuxTalksApp;
 
 fn main() -> iced::Result {
+    // Setup logging
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .init();
+
     application("TuxTalks", TuxTalksApp::update, TuxTalksApp::view)
         .theme(TuxTalksApp::theme)
         .subscription(TuxTalksApp::subscription)

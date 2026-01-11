@@ -9,10 +9,10 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
-use tracing::{debug, info, warn};
+use std::path::PathBuf;
+use tracing::{debug, info};
 
-use crate::commands::{Command, Macro, MacroStep};
+use crate::commands::{Command, Macro};
 
 /// A key binding from a game's config
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,6 +46,9 @@ pub struct GameProfile {
     pub virtual_tags: HashMap<String, Vec<String>>,
     /// Process names to look for (e.g., ["EliteDangerous64.exe"])
     pub process_names: Vec<String>,
+    /// Path-based discriminators to check in cmdline (e.g., ["steamapps", "compatdata"])
+    #[serde(default)]
+    pub path_discriminators: Vec<String>,
     /// Is this profile active?
     pub enabled: bool,
 }
@@ -61,6 +64,7 @@ impl GameProfile {
             macros: Vec::new(),
             virtual_tags: HashMap::new(),
             process_names: Vec::new(),
+            path_discriminators: Vec::new(),
             enabled: false,
         };
 
@@ -208,16 +212,50 @@ impl GameManager {
             .refresh_processes(sysinfo::ProcessesToUpdate::All, true);
 
         for (i, profile) in self.profiles.iter().enumerate() {
+            // Check process names
             for proc_name in &profile.process_names {
-                // Check if any process matches
+                let proc_name_lower = proc_name.to_lowercase();
+
                 let running = self.sys.processes().values().any(|p| {
-                    p.name()
-                        .to_string_lossy()
-                        .to_lowercase()
-                        .contains(&proc_name.to_lowercase())
+                    let name = p.name().to_string_lossy().to_lowercase();
+                    let exe = p
+                        .exe()
+                        .map(|e| e.to_string_lossy().to_lowercase())
+                        .unwrap_or_default();
+                    let cmdline = p
+                        .cmd()
+                        .iter()
+                        .map(|s| s.to_string_lossy().to_lowercase())
+                        .collect::<Vec<_>>()
+                        .join(" ");
+
+                    // Check if name or exe or cmdline contains the process name
+                    name.contains(&proc_name_lower)
+                        || exe.contains(&proc_name_lower)
+                        || cmdline.contains(&proc_name_lower)
                 });
 
                 if running {
+                    // If we have discriminators, check them too (Red Team - Stamos requirement for security/precision)
+                    if !profile.path_discriminators.is_empty() {
+                        let has_discriminator = self.sys.processes().values().any(|p| {
+                            let cmdline = p
+                                .cmd()
+                                .iter()
+                                .map(|s| s.to_string_lossy().to_lowercase())
+                                .collect::<Vec<_>>()
+                                .join(" ");
+                            profile
+                                .path_discriminators
+                                .iter()
+                                .any(|d| cmdline.contains(&d.to_lowercase()))
+                        });
+
+                        if !has_discriminator {
+                            continue; // Process name matched but path discriminator didn't
+                        }
+                    }
+
                     debug!("🎯 Auto-detected game: {}", profile.name);
                     self.active_profile_index = Some(i);
                     return Some(i);

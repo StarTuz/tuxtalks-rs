@@ -1,0 +1,27 @@
+#!/bin/bash
+# TuxTalks Pre-commit Hook (Alex - Security)
+# Runs clippy and fmt before each commit.
+#
+# To install: cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+set -e
+
+echo "🔍 TuxTalks Pre-commit Checks..."
+
+# Check for clippy
+echo "  📎 Running Clippy..."
+cargo clippy --all-targets --all-features -- -D warnings 2>&1 | head -50
+if [ ${PIPESTATUS[0]} -ne 0 ]; then
+    echo "❌ Clippy failed. Fix warnings before committing."
+    exit 1
+fi
+
+# Check formatting
+echo "  🎨 Checking format..."
+cargo fmt -- --check
+if [ $? -ne 0 ]; then
+    echo "❌ Format check failed. Run 'cargo fmt' before committing."
+    exit 1
+fi
+
+echo "✅ Pre-commit checks passed!"

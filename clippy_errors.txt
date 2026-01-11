@@ -1,0 +1,215 @@
+    Checking tuxtalks v0.1.0 (/home/startux/Code/tuxtalks-rs)
+error: redundant pattern matching, consider using `is_err()`
+  --> src/audio/mod.rs:54:20
+   |
+54 |             if let Err(_) = tx.send(data.to_vec()) {
+   |             -------^^^^^^------------------------- help: try: `if tx.send(data.to_vec()).is_err()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#redundant_pattern_matching
+   = note: `-D clippy::redundant-pattern-matching` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::redundant_pattern_matching)]`
+
+error: redundant closure
+   --> src/gui/tabs/settings.rs:116:27
+    |
+116 |                 .on_input(|s| Message::JRiverPortChanged(s))
+    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `Message::JRiverPortChanged`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#redundant_closure
+    = note: `-D clippy::redundant-closure` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::redundant_closure)]`
+
+error: match can be simplified with `.unwrap_or_default()`
+   --> src/gui/mod.rs:878:34
+    |
+878 |                       let config = match crate::config::Config::load() {
+    |  __________________________________^
+879 | |                         Ok(c) => c,
+880 | |                         Err(_) => crate::config::Config::default(),
+881 | |                     };
+    | |_____________________^ help: replace it with: `crate::config::Config::load().unwrap_or_default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#manual_unwrap_or_default
+    = note: `-D clippy::manual-unwrap-or-default` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_unwrap_or_default)]`
+
+error: redundant pattern matching, consider using `is_ok()`
+  --> src/ipc/client.rs:32:9
+   |
+32 | /         match UnixStream::connect(&path) {
+33 | |             Ok(_) => true,
+34 | |             Err(_) => false,
+35 | |         }
+   | |_________^ help: try: `UnixStream::connect(&path).is_ok()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#redundant_pattern_matching
+
+error: you should consider adding a `Default` implementation for `LALManager`
+  --> src/lal.rs:21:5
+   |
+21 | /     pub fn new() -> Self {
+22 | |         let packs_dir = dirs::data_dir()
+23 | |             .unwrap_or_else(|| PathBuf::from("."))
+24 | |             .join("tuxtalks/packs");
+...  |
+34 | |         manager
+35 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+   = note: `-D clippy::new-without-default` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::new_without_default)]`
+help: try adding this
+   |
+19 + impl Default for LALManager {
+20 +     fn default() -> Self {
+21 +         Self::new()
+22 +     }
+23 + }
+   |
+
+error: use of `unwrap_or_else` to construct default value
+  --> src/library.rs:95:47
+   |
+95 | ...                   metadata.composer.unwrap_or_else(|| "".to_string()),
+   |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `unwrap_or_default()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#unwrap_or_default
+   = note: `-D clippy::unwrap-or-default` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::unwrap_or_default)]`
+
+error: use of `unwrap_or_else` to construct default value
+  --> src/library.rs:96:44
+   |
+96 | ...                   metadata.genre.unwrap_or_else(|| "".to_string()),
+   |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `unwrap_or_default()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#unwrap_or_default
+
+error: method `from_str` can be confused for the standard trait method `std::str::FromStr::from_str`
+  --> src/player_manager.rs:45:5
+   |
+45 | /     pub fn from_str(s: &str) -> Option<Self> {
+46 | |         match s.to_lowercase().as_str() {
+47 | |             "jriver" | "j river" | "jriver media center" => Some(PlayerType::JRiver),
+48 | |             "strawberry" | "strawberry music" => Some(PlayerType::Strawberry),
+...  |
+53 | |     }
+   | |_____^
+   |
+   = help: consider implementing the trait `std::str::FromStr` or choosing a less ambiguous method name
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#should_implement_trait
+   = note: `-D clippy::should-implement-trait` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::should_implement_trait)]`
+
+error: you seem to be trying to use `match` for destructuring a single pattern. Consider using `if let`
+    --> src/players/jriver.rs:997:9
+     |
+ 997 | /         match self.send_command("Playback/Playlist", "").await {
+ 998 | |             Ok(xml) => {
+ 999 | |                 let mut reader = Reader::from_str(&xml);
+1000 | |                 let mut current_name = String::new();
+...    |
+1041 | |             Err(_) => {}
+1042 | |         }
+     | |_________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#single_match
+     = note: `-D clippy::single-match` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::single_match)]`
+help: try
+     |
+ 997 ~         if let Ok(xml) = self.send_command("Playback/Playlist", "").await {
+ 998 +             let mut reader = Reader::from_str(&xml);
+ 999 +             let mut current_name = String::new();
+1000 +             let mut current_key = String::new();
+1001 +             let mut in_field = false;
+1002 +             let mut field_name = String::new();
+1003 + 
+1004 +             loop {
+1005 +                 match reader.read_event() {
+1006 +                     Ok(Event::Start(ref e)) if e.name().as_ref() == b"Field" => {
+1007 +                         for attr in e.attributes().flatten() {
+1008 +                             if attr.key.as_ref() == b"Name" {
+1009 +                                 field_name =
+1010 +                                     String::from_utf8_lossy(attr.value.as_ref()).to_string();
+1011 +                                 in_field = true;
+1012 +                             }
+1013 +                         }
+1014 +                     }
+1015 +                     Ok(Event::Text(ref e)) if in_field => {
+1016 +                         if let Ok(text) = e.unescape() {
+1017 +                             if field_name == "Name" {
+1018 +                                 current_name = text.to_string();
+1019 +                             } else if field_name == "Key" {
+1020 +                                 current_key = text.to_string();
+1021 +                             }
+1022 +                         }
+1023 +                     }
+1024 +                     Ok(Event::End(ref e)) if e.name().as_ref() == b"Field" => {
+1025 +                         in_field = false;
+1026 +                     }
+1027 +                     Ok(Event::End(ref e)) if e.name().as_ref() == b"Item" => {
+1028 +                         if !current_name.is_empty() {
+1029 +                             tracks.push((current_name.clone(), current_key.clone()));
+1030 +                         }
+1031 +                         current_name.clear();
+1032 +                         current_key.clear();
+1033 +                     }
+1034 +                     Ok(Event::Eof) => break,
+1035 +                     Err(_) => break,
+1036 +                     _ => (),
+1037 +                 }
+1038 +             }
+1039 +         }
+     |
+
+error: manual `RangeInclusive::contains` implementation
+   --> src/selection.rs:269:12
+    |
+269 |         if n >= 1 && n <= 99 {
+    |            ^^^^^^^^^^^^^^^^^ help: use: `(1..=99).contains(&n)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#manual_range_contains
+    = note: `-D clippy::manual-range-contains` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_range_contains)]`
+
+error: you should consider adding a `Default` implementation for `SystemEngine`
+  --> src/tts/system.rs:13:5
+   |
+13 | /     pub fn new() -> Self {
+14 | |         Self
+15 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+   |
+12 + impl Default for SystemEngine {
+13 +     fn default() -> Self {
+14 +         Self::new()
+15 +     }
+16 + }
+   |
+
+error: manual implementation of `.is_multiple_of()`
+   --> src/voice_fingerprint.rs:128:12
+    |
+128 |         if total % 10 == 0 {
+    |            ^^^^^^^^^^^^^^^ help: replace with: `total.is_multiple_of(10)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#manual_is_multiple_of
+    = note: `-D clippy::manual-is-multiple-of` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_is_multiple_of)]`
+
+error: the borrowed expression implements the required traits
+   --> src/voice_fingerprint.rs:319:25
+    |
+319 |         fs::write(path, &header)?;
+    |                         ^^^^^^^ help: change this to: `header`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#needless_borrows_for_generic_args
+    = note: `-D clippy::needless-borrows-for-generic-args` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_borrows_for_generic_args)]`
+
+error: could not compile `tuxtalks` (lib) due to 13 previous errors

@@ -1,0 +1,176 @@
+    Checking tuxtalks v0.1.0 (/home/startux/Code/tuxtalks-rs)
+error[E0432]: unresolved imports `sysinfo::ProcessExt`, `sysinfo::SystemExt`
+ --> src/gui/wizards/add_game.rs:6:15
+  |
+6 | use sysinfo::{ProcessExt, System, SystemExt};
+  |               ^^^^^^^^^^          ^^^^^^^^^ no `SystemExt` in the root
+  |               |
+  |               no `ProcessExt` in the root
+  |
+help: a similar name exists in the module
+  |
+6 - use sysinfo::{ProcessExt, System, SystemExt};
+6 + use sysinfo::{Process, System, SystemExt};
+  |
+help: a similar name exists in the module
+  |
+6 - use sysinfo::{ProcessExt, System, SystemExt};
+6 + use sysinfo::{ProcessExt, System, System};
+  |
+
+warning: unused import: `debug`
+ --> src/audio.rs:8:15
+  |
+8 | use tracing::{debug, info, warn};
+  |               ^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Context`
+ --> src/config.rs:1:14
+  |
+1 | use anyhow::{Context, Result};
+  |              ^^^^^^^
+
+warning: unused import: `Path`
+ --> src/config.rs:4:17
+  |
+4 | use std::path::{Path, PathBuf};
+  |                 ^^^^
+
+warning: unused import: `Path`
+  --> src/games/mod.rs:12:17
+   |
+12 | use std::path::{Path, PathBuf};
+   |                 ^^^^
+
+warning: unused import: `warn`
+  --> src/games/mod.rs:13:28
+   |
+13 | use tracing::{debug, info, warn};
+   |                            ^^^^
+
+warning: unused import: `MacroStep`
+  --> src/games/mod.rs:15:39
+   |
+15 | use crate::commands::{Command, Macro, MacroStep};
+   |                                       ^^^^^^^^^
+
+warning: unused imports: `Column`, `pick_list`, `scrollable`, and `text_input`
+ --> src/gui/mod.rs:5:52
+  |
+5 | use iced::widget::{button, column, container, row, scrollable, text, Column, pick_list, Space, text_input};
+  |                                                    ^^^^^^^^^^        ^^^^^^  ^^^^^^^^^         ^^^^^^^^^^
+
+warning: unused import: `futures::StreamExt`
+ --> src/gui/mod.rs:7:5
+  |
+7 | use futures::StreamExt;
+  |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `debug`
+ --> src/gui/mod.rs:9:27
+  |
+9 | use tracing::{info, warn, debug};
+  |                           ^^^^^
+
+warning: unused import: `GameProfile`
+  --> src/gui/mod.rs:11:33
+   |
+11 | use crate::games::{GameManager, GameProfile};
+   |                                 ^^^^^^^^^^^
+
+warning: unused import: `Command`
+  --> src/gui/mod.rs:14:41
+   |
+14 | use crate::commands::{CommandProcessor, Command};
+   |                                         ^^^^^^^
+
+warning: unused import: `TuxTalksApp`
+ --> src/gui/wizards/add_game.rs:1:27
+  |
+1 | use crate::gui::{Message, TuxTalksApp};
+  |                           ^^^^^^^^^^^
+
+warning: unused import: `warn`
+  --> src/input.rs:12:28
+   |
+12 | use tracing::{debug, info, warn};
+   |                            ^^^^
+
+error[E0061]: this method takes 2 arguments but 0 arguments were supplied
+   --> src/gui/wizards/add_game.rs:73:24
+    |
+ 73 |                 system.refresh_processes();
+    |                        ^^^^^^^^^^^^^^^^^-- two arguments of type `ProcessesToUpdate<'_>` and `bool` are missing
+    |
+note: method defined here
+   --> /home/startux/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sysinfo-0.33.1/src/common/system.rs:291:12
+    |
+291 |     pub fn refresh_processes(
+    |            ^^^^^^^^^^^^^^^^^
+help: provide the arguments
+    |
+ 73 |                 system.refresh_processes(/* ProcessesToUpdate<'_> */, /* bool */);
+    |                                          +++++++++++++++++++++++++++++++++++++++
+
+error[E0599]: the method `to_string` exists for reference `&OsStr`, but its trait bounds were not satisfied
+   --> src/gui/wizards/add_game.rs:80:43
+    |
+ 80 |                         name: proc.name().to_string(),
+    |                                           ^^^^^^^^^
+    |
+   ::: /home/startux/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/ffi/os_str.rs:119:1
+    |
+119 | pub struct OsStr {
+    | ---------------- doesn't satisfy `OsStr: ToString` or `OsStr: std::fmt::Display`
+    |
+    = note: the following trait bounds were not satisfied:
+            `OsStr: std::fmt::Display`
+            which is required by `OsStr: ToString`
+            `&OsStr: std::fmt::Display`
+            which is required by `&OsStr: ToString`
+
+error[E0308]: mismatched types
+   --> src/gui/wizards/add_game.rs:81:46
+    |
+ 81 |                         cmd: proc.cmd().join(" "),
+    |                                         ---- ^^^ expected `&OsStr`, found `&str`
+    |                                         |
+    |                                         arguments to this method are incorrect
+    |
+    = note: expected reference `&OsStr`
+               found reference `&'static str`
+help: the return type of this call is `&'static str` due to the type of the argument passed
+   --> src/gui/wizards/add_game.rs:81:30
+    |
+ 81 |                         cmd: proc.cmd().join(" "),
+    |                              ^^^^^^^^^^^^^^^^---^
+    |                                              |
+    |                                              this argument influences the return type of `join`
+note: method defined here
+   --> /home/startux/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/slice.rs:592:12
+    |
+592 |     pub fn join<Separator>(&self, sep: Separator) -> <Self as Join<Separator>>::Output
+    |            ^^^^
+
+error[E0308]: mismatched types
+  --> src/gui/wizards/add_game.rs:81:30
+   |
+81 |                         cmd: proc.cmd().join(" "),
+   |                              ^^^^^^^^^^^^^^^^^^^^ expected `String`, found `OsString`
+
+warning: variable does not need to be mutable
+   --> src/gui/mod.rs:516:29
+    |
+516 |                 |(listener, mut rx): (crate::input::InputListener, Option<tokio::sync::mpsc::Receiver<String>>)| async move {
+    |                             ----^^
+    |                             |
+    |                             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+Some errors have detailed explanations: E0061, E0308, E0432, E0599.
+For more information about an error, try `rustc --explain E0061`.
+warning: `tuxtalks` (lib) generated 14 warnings
+error: could not compile `tuxtalks` (lib) due to 5 previous errors; 14 warnings emitted

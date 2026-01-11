@@ -1,0 +1,8 @@
+# Clippy Configuration (Alex - Security)
+# See: https://doc.rust-lang.org/clippy/
+
+# Allow breaking exported API for internal refactoring
+avoid-breaking-exported-api = false
+
+# Cognitive complexity threshold
+cognitive-complexity-threshold = 25
