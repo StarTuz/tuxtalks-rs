@@ -597,8 +597,8 @@ impl MediaPlayer for JRiverPlayer {
 
         info!("Playing artist: {}", target);
         let encoded = urlencoding::encode(&target);
-        // Fix: Use Playback/Play for exact artist playback. Action=0 is "Replace and Play".
-        let params = format!("Query=[Artist]=[{}]&Action=0&Zone=-1", encoded);
+        // Fix: Use Playback/Play for exact artist playback. Action=3 is "Replace and Play".
+        let params = format!("Query=[Artist]=[{}]&Action=3&Zone=-1", encoded);
         self.send_command("Playback/Play", &params).await?;
         Ok(())
     }
@@ -622,10 +622,10 @@ impl MediaPlayer for JRiverPlayer {
         };
 
         info!("Playing album: {}", target);
-        // Fix: Use Playback/Play for exact album playback. Action=0 is "Replace and Play".
+        // Fix: Use Playback/Play for exact album playback. Action=3 is "Replace and Play".
         let encoded = urlencoding::encode(&target);
         // Play the exact album tracks, in order.
-        let params = format!("Query=[Album]=[{}]&Action=0&Zone=-1", encoded);
+        let params = format!("Query=[Album]=[{}]&Action=3&Zone=-1", encoded);
         self.send_command("Playback/Play", &params).await?;
         Ok(())
     }
@@ -633,8 +633,8 @@ impl MediaPlayer for JRiverPlayer {
     async fn play_song(&self, song: &str) -> Result<()> {
         info!("Playing song: {}", song);
         let encoded = urlencoding::encode(song);
-        // Fix: Use Playback/Play for exact song playback. Action=0 is "Replace and Play".
-        let params = format!("Query=[Name]=[{}]&Action=0&Zone=-1", encoded);
+        // Fix: Use Playback/Play for exact song playback. Action=3 is "Replace and Play".
+        let params = format!("Query=[Name]=[{}]&Action=3&Zone=-1", encoded);
         // Play the specific song(s)
         self.send_command("Playback/Play", &params).await?;
         Ok(())
@@ -654,8 +654,8 @@ impl MediaPlayer for JRiverPlayer {
                     "🎯 Matched Playlist: '{}' (Score: {:.2})",
                     best.value, best.score
                 );
-                // Action=0 is Replace for PlayPlaylist
-                let params = format!("Playlist={}&PlaylistType=ID&Action=0&Zone=-1", id);
+                // Action=3 is Replace for PlayPlaylist in MCWS v1
+                let params = format!("Playlist={}&PlaylistType=ID&Action=3&Zone=-1", id);
                 self.send_command("Playback/PlayPlaylist", &params).await?;
 
                 if shuffle {
